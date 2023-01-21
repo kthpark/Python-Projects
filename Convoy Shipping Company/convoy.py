@@ -4,20 +4,15 @@ import csv
 from sqlite3 import Error
 
 
-def xlsx_filter(file_name):
+def check_file(file_name):
     if file_name[-5:] == '.xlsx':
         vehicles_df = pd.read_excel(file_name, sheet_name='Vehicles', dtype=str)
         file_name = file_name.replace('.xlsx', '.csv')
         vehicles_df.to_csv(file_name, index=False, header=True, encoding='utf-8')
         print(f'{vehicles_df.shape[0]} line{"s were" if vehicles_df.shape[0]> 1 else " was"} imported to {file_name}')
+    elif file_name[-5:] == '.s3db':
 
-    check_file(file_name)
-
-
-def check_file(file_name):
-    if file_name[-5:] == '.s3db':
-
-        s3db_to_json(file_name)
+        sql_to_json(file_name)
 
     else:
         counter = 0
@@ -49,6 +44,7 @@ def create_conn(file_name):
         conn = sqlite3.connect(db_filename)
     except Error as e:
         print(e)
+
     create_table(conn, file_name, db_filename)
 
 
@@ -69,12 +65,16 @@ def create_table(conn, file_name, db_filename):
                 values = tuple(line)
                 c.execute(f'INSERT INTO convoy{headers} values{values};')
                 count += 1
+
         print(f'{count - 1} record{"s were" if count != 2 else " was"} inserted into {db_filename}')
+
     conn.commit()
+
     fuel_score(conn, db_filename)
 
 
 def fuel_score(conn, db_filename):
+
     conn.execute('ALTER TABLE convoy ADD COLUMN score INT NOT NULL DEFAULT 0')
     conn.execute('UPDATE convoy SET score = 2 WHERE maximum_load >= 20')
     conn.execute('UPDATE convoy SET score = score + 1 WHERE fuel_consumption * 4.5 > 230')
@@ -82,30 +82,30 @@ def fuel_score(conn, db_filename):
     conn.execute('UPDATE convoy SET score = score + 2 WHERE fuel_consumption * 4.5 / engine_capacity < 1')
     conn.execute('UPDATE convoy SET score = score + 1 WHERE floor(fuel_consumption * 4.5 / engine_capacity) = 1')
     conn.commit()
-    s3db_to_json(db_filename)
+
+    sql_to_json(db_filename)
 
 
-def s3db_to_json(db_filename):
+def sql_to_json(db_filename):
     conn = sqlite3.connect(db_filename)
     database = pd.read_sql_query("SELECT * FROM convoy", conn)
-    database = database.loc[database['score'] > 3]
-    database = database.filter(items=database.keys()[:-1])
+    database = database.loc[database['score'] > 3].filter(items=database.keys()[:-1])
     result = database.to_json(orient='records')
     result = '{"convoy":' + result + '}'
     db_filename = f'{db_filename[:-5]}.json'
+
     with open(db_filename, 'w') as file:
         file.write(result)
-    if len(database) == 1:
-        print(f'1 vehicle was saved into {db_filename}')
-    else:
-        print(f'{len(database)} vehicles were saved into {db_filename}')
-    s3db_to_xml(conn, db_filename)
+
+    print(f'{len(database)} vehicle{"s were" if len(database) > 1 else " was"} saved into {db_filename}.xml')
+
+    sql_to_xml(conn, db_filename)
 
 
-def s3db_to_xml(conn, db_filename):
+def sql_to_xml(conn, db_filename):
+
     database = pd.read_sql_query("SELECT * FROM convoy", conn)
-    database = database.loc[database['score'] <= 3]
-    database = database.filter(items=database.keys()[:-1])
+    database = database.loc[database['score'] <= 3].filter(items=database.keys()[:-1])
     result = database.to_xml(root_name='convoy', row_name='vehicle', xml_declaration=False, index=False)
     if result == '<convoy/>':
         result = '<convoy></convoy>'
@@ -117,4 +117,4 @@ def s3db_to_xml(conn, db_filename):
 
 if __name__ == '__main__':
     input_file_name = input('Input file name\n')
-    xlsx_filter(input_file_name)
+    check_file(input_file_name)

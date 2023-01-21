@@ -57,66 +57,43 @@ def main_menu():
 
 
 def create_tables(conn):
-    sql1 = """CREATE TABLE IF NOT EXISTS companies (
-                ticker TEXT PRIMARY KEY,
-                name TEXT,
-                sector TEXT
-            ); """
-    sql2 = """CREATE TABLE IF NOT EXISTS financial (
-                ticker TEXT PRIMARY KEY,
-                ebitda REAL,
-                sales REAL,
-                net_profit REAL,
-                market_price REAL,
-                net_debt REAL,
-                assets REAL,
-                equity REAL,
-                cash_equivalents REAL,
-                liabilities REAL DEFAULT None
-            ); """
+    sql1 = """CREATE TABLE IF NOT EXISTS companies (ticker TEXT PRIMARY KEY, name TEXT, sector TEXT);"""
+    sql2 = """CREATE TABLE IF NOT EXISTS financial (ticker TEXT PRIMARY KEY, ebitda REAL, sales REAL, net_profit REAL, 
+    market_price REAL, net_debt REAL, assets REAL, equity REAL, cash_equivalents REAL, liabilities REAL DEFAULT None);"""
     try:
-        c = conn.cursor()
-        c.execute(sql1)
-        c.execute(sql2)
+        cur = conn.cursor()
+        cur.execute(sql1)
+        cur.execute(sql2)
         sql = 'SELECT COUNT(ticker) FROM companies'
-        cnt = c.execute(sql).fetchone()
-        return cnt[0]
+        count = cur.execute(sql).fetchone()
+        return count[0]
     except Error as e:
         print(e)
 
 
 def new_company():
-    vals = []
+    values = []
     for s in menus.COMP_STR.split('\n'):
-        vals.append(input(s + '\n'))
-    v1 = ','.join(vals)
-    add_comp(conn, [v1])
+        values.append(input(s + '\n'))
+    temp = ','.join(values)
+    add_comp(conn, [temp])
     for s in menus.FIN_STR.split('\n'):
-        vals.append(input(s + '\n'))
-    v2 = ','.join([vals[0]] + vals[3:])
-    add_fin(conn, [v2])
+        values.append(input(s + '\n'))
+    temp2 = ','.join([values[0]] + values[3:])
+    add_fin_data(conn, [temp2])
     print('Company created successfully!')
 
 
 def upd_fin(data):
-    sql = ''' UPDATE financial
-                SET ebitda = ?,
-                    sales = ?,
-                    net_profit = ?,
-                    market_price = ?,
-                    net_debt = ?,
-                    assets = ?,
-                    equity = ?,
-                    cash_equivalents = ?,
-                    liabilities = ?    
-                WHERE ticker = ? '''
+    sql = """UPDATE financial SET ebitda = ?, sales = ?, net_profit = ?, market_price = ?, net_debt = ?, assets = ?, 
+    equity = ?, cash_equivalents = ?, liabilities = ? WHERE ticker = ?"""
     cur = conn.cursor()
     cur.execute(sql, data.split(','))
     conn.commit()
 
 
 def add_comp(conn, data):
-    sql = ''' INSERT INTO companies(ticker,name,sector) VALUES(?,?,?) '''
+    sql = """INSERT INTO companies(ticker,name,sector) VALUES(?,?,?)"""
     cur = conn.cursor()
     for row in data:
         if '"' in row:
@@ -131,9 +108,8 @@ def add_comp(conn, data):
     conn.commit()
 
 
-def add_fin(conn, data):
-    sql = ''' INSERT INTO financial
-                VALUES(?,?,?,?,?,?,?,?,?,?) '''
+def add_fin_data(conn, data):
+    sql = """INSERT INTO financial VALUES(?,?,?,?,?,?,?,?,?,?)"""
     cur = conn.cursor()
     for row in data:
         row = [x if x else None for x in row.split(',')]
@@ -249,7 +225,7 @@ def create_db():
         data = read_data('test/companies.csv')
         add_comp(conn, data)
         data = read_data('test/financial.csv')
-        add_fin(conn, data)
+        add_fin_data(conn, data)
     return conn
 
 
